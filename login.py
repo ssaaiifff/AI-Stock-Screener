@@ -2,6 +2,20 @@ import streamlit as st
 import pandas as pd
 import os
 
+def set_background():
+    page_bg_img = '''
+    <style>
+    .stApp {
+        background: linear-gradient(to right, #3366ff, #ff99cc);
+        color: Black;
+    }
+    h1, h2, h3, h4, h5, h6, p, label, span, div {
+        color: black !important;
+    }
+    </style>
+    '''
+    st.markdown(page_bg_img, unsafe_allow_html=True)
+    
 class AuthSystem:
     def __init__(self):
         self.file_path = "users.csv"
@@ -18,6 +32,16 @@ class AuthSystem:
     
     def save_users(self, df):
         df.to_csv(self.file_path, index=False)
+    
+    def login_signup_screen(self):
+        st.title("Welcome to AI Stock Screener")
+        tabs = ["Login", "Signup"]
+        choice = st.radio("Select Option", tabs)
+
+        if choice == "Login":
+            self.login()
+        else:
+            self.signup()
     
     def login(self):
         st.subheader("Login to Your Account")
@@ -48,23 +72,20 @@ class AuthSystem:
                 new_user = pd.DataFrame({"username": [new_username], "password": [new_password]})
                 users_df = pd.concat([users_df, new_user], ignore_index=True)
                 self.save_users(users_df)
-                st.success("Account created successfully! You can now log in.")
+                st.success("Account created successfully! Logging you in...")
+                st.session_state.authenticated = True
+                st.session_state.username = new_username
+                st.rerun()
 
-st.title("Welcome to AI Stock Screener")
+set_background()
 auth = AuthSystem()
-tabs = ["Login", "Signup"]
-choice = st.sidebar.radio("Select Option", tabs)
 
-if st.session_state.authenticated:
+if not st.session_state.authenticated:
+    auth.login_signup_screen()
+else:
     st.success(f"You are logged in as {st.session_state.username}")
     st.write("**Stock Screener Dashboard Coming Soon...**")
     if st.button("Logout"):
         st.session_state.authenticated = False
         st.session_state.username = ""
         st.rerun()
-else:
-    if choice == "Login":
-        auth.login()
-    else:
-        auth.signup()
-
