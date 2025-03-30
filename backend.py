@@ -11,7 +11,7 @@ from statsmodels.tsa.arima.model import ARIMA
 
 class StockForecastModel:
     BASE_URL = "https://api.marketstack.com/v1/eod"
-    API_KEY = "8d2cf507845a1c54c2a7fb522b51f271"
+    API_KEY = "d7fb2fb3a988d314e2019bd56e62965a"
 
 
     def set_background():
