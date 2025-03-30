@@ -13,15 +13,19 @@ def set_background():
             color: black !important;
         }
         </style>
-        '''
+    '''
     st.markdown(page_bg_img, unsafe_allow_html=True)
+
+# Apply background
 set_background()
+
+# Title
 st.title("Welcome to AI Stock Screener")
 
-# Initialize authentication system
+# Initialize authentication
 auth = AuthSystem()
 
-# If the user is logged in, show the stock forecasting app
+# Show app if user is authenticated
 if st.session_state.authenticated:
     app = StockForecastModel()
     app.run()
@@ -31,12 +35,4 @@ if st.session_state.authenticated:
         st.session_state.username = ""
         st.rerun()
 else:
-    tabs = ["Login", "Signup"]
-    choice = st.sidebar.radio("Select Option", tabs)
-
-    if choice == "Login":
-        auth.login()
-    else:
-        auth.signup()
-
-
+    auth.login_signup_screen()  # ✅ This is the ONLY place where login widget is created
