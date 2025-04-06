@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from statsmodels.tsa.arima.model import ARIMA
+from google import genai
 
 
 class StockForecastModel:
@@ -14,44 +15,7 @@ class StockForecastModel:
     API_KEY = "d7fb2fb3a988d314e2019bd56e62965a"
 
 
-    def set_background():
-        page_bg_img = '''
-        <style>
-        .stApp {
-            background: linear-gradient(to right, #3366ff, #ff99cc);
-            color: white;
-        }
-
-        h1, h2, h3, h4, h5, h6, p, label, span, div {
-            color: black !important;
-        }
-
-        .logout-button {
-            position: absolute;
-            top: 10px;
-            right: 2px;
-            background-color: #5A189A;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 15px;
-            cursor: pointer;
-            font-size: 20px;
-        }
-
-        .logout-button:hover {
-            background-color: #00FFFF;
-        }
-        </style>
-        '''
-        st.markdown(page_bg_img, unsafe_allow_html=True)
-
-    # Apply background styling
-    set_background()
-
-    # Display the logout button
-    st.markdown('<button class="logout-button">Logout</button>', unsafe_allow_html=True)
-
+    
 
     def __init__(self):
         self.symbol = None
@@ -59,6 +23,28 @@ class StockForecastModel:
         self.timeframe = "Monthly"
         self.start_date = None
         self.end_date = None
+        self.genai_client = genai.Client(api_key="AIzaSyANcyTEGxPrVnOQ1_KTD6xfNNmyYmJEyZ4")
+
+
+    def generate_recommendation(self, symbol, start, end, model, price, mse, frequency):
+        prompt = (
+            f"Act as a professional stock trader and Based on the stock prediction results for {symbol} from {start} to {end} "
+            f"using {frequency} frequency data:\n\n"
+            f"• Best model: {model}\n"
+            f"• Predicted price: ${price:.2f}\n"
+            f"• Model MSE: {mse:.4f}\n\n"
+            f"Generate a short recommendation (2-3 lines) for investors considering accuracy and model used. "
+            f"Be realistic and professional."
+        )
+        try:
+            response = self.genai_client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=prompt
+            )
+            return response.text.strip()
+        except Exception as e:
+            return f"⚠️ Could not generate recommendation due to error: {e}"
+
 
     def fetch_stock_data(self):
         if not self.symbol:
@@ -84,7 +70,7 @@ class StockForecastModel:
             df = df.set_index("timestamp")["4. close"].sort_index()
 
             self.df = df
-            st.success(f"Successfully fetched data for {self.symbol} from {self.start_date.strftime('%Y-%m-%d')} to {self.end_date.strftime('%Y-%m-%d')}")
+            # st.success(f"Successfully fetched data for {self.symbol} from {self.start_date.strftime('%Y-%m-%d')} to {self.end_date.strftime('%Y-%m-%d')}")
             return self.df
         except requests.exceptions.RequestException as e:
             st.error(f"Error during API request: {e}")
@@ -261,14 +247,45 @@ class StockForecastModel:
             st.plotly_chart(fig)  # Show empty figure
             return
 
-        fig.update_layout(title=f"{model_name} Predictions vs Actual",
-                        xaxis_title="Date", yaxis_title="Stock Price")
+        fig.update_layout(
+            title=dict(
+                text=f"{model_name} Predictions vs Actual",
+                font=dict(size=22, color='black')
+            ),
+            xaxis=dict(
+                title=dict(text="Date", font=dict(color="black")),
+                tickfont=dict(color="black"),
+                showgrid=True,
+                gridcolor='rgba(200,200,200,0.3)'
+            ),
+            yaxis=dict(
+                title=dict(text="Stock Price", font=dict(color="black")),
+                tickfont=dict(color="black"),
+                showgrid=True,
+                gridcolor='rgba(200,200,200,0.3)'
+            ),
+            plot_bgcolor='rgba(255, 255, 255, 0.4)',  # Semi-transparent background
+            paper_bgcolor='rgba(255, 255, 255, 0.0)',
+            font=dict(color='black'),
+            legend=dict(
+            orientation="h",  # Horizontal layout
+            yanchor="bottom",
+            y=-0.3,            # Push it below the chart
+            xanchor="center",
+            x=0.5,
+            bgcolor='rgba(255,255,255,0.5)',
+            bordercolor='rgba(0,0,0,0.2)',
+            borderwidth=1
+            ),
+            margin=dict(l=40, r=40, t=60, b=40)
+        )
+
+
 
         st.plotly_chart(fig)
 
 
     def run(self):
-        st.title("📈 Stock Price Forecasting")
         stock_symbols = {
             "AAPL": "Apple Inc.",
             "MSFT": "Microsoft Corporation",
@@ -339,10 +356,60 @@ class StockForecastModel:
                 best_model = min(valid_models, key=lambda k: valid_models[k][1])
                 best_price = valid_models[best_model][0]
                 best_mse = valid_models[best_model][1] # Get the best MSE value.
+                # Styled output block
+                st.markdown("""
+                    <div style="
+                        background: rgba(255, 255, 255, 0.2);
+                        padding: 20px;
+                        border-radius: 15px;
+                        margin-top: 20px;
+                        box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+                        backdrop-filter: blur(12px);
+                        -webkit-backdrop-filter: blur(12px);
+                    ">
+                        <h4 style="margin-bottom: 10px;">✅ <u>Prediction Summary</u></h4>
+                        <p><b>📈 Successfully fetched data for:</b> <span style="color: #007bff;">{symbol}</span></p>
+                        <p><b>📅 Date Range:</b> {start} to {end}</p>
+                        <p><b>🤖 Best Model:</b> <span style="color: #2b9348;">{model}</span></p>
+                        <p><b>💰 Predicted Price:</b> <span style="color: #d00000;">${price:.2f}</span></p>
+                        <p><b>📉 Model MSE:</b> {mse:.4f}</p>
+                    </div>
+                """.format(
+                    symbol=self.symbol,
+                    start=self.start_date.strftime('%Y-%m-%d'),
+                    end=self.end_date.strftime('%Y-%m-%d'),
+                    model=best_model,
+                    price=best_price,
+                    mse=best_mse
+                ), unsafe_allow_html=True)
+                st.markdown("<br><br>", unsafe_allow_html=True)
 
-                st.write(f"Best Model: **{best_model}**")
-                st.write(f"Predicted Stock Price: **${best_price:.2f}**")
-                st.write(f"Best Model MSE: **{best_mse:.4f}**") # Print the MSE Value.
+                recommendation = self.generate_recommendation(
+                    self.symbol, 
+                    self.start_date.strftime('%Y-%m-%d'),
+                    self.end_date.strftime('%Y-%m-%d'),
+                    best_model,
+                    best_price,
+                    best_mse,
+                    self.timeframe
+                )
+
+                st.markdown("""
+                    <div style="
+                        margin-top: 30px;
+                        padding: 15px;
+                        border-left: 5px solid #2196F3;
+                        background-color: rgba(255,255,255,0.3);
+                        border-radius: 10px;
+                        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+                    ">
+                    <h4>🔍 Gemini AI's Recommendation</h4>
+                    <p style="font-style: italic;">{}</p>
+                    </div>
+                """.format(recommendation), unsafe_allow_html=True)
+
+                st.markdown("<br><br>", unsafe_allow_html=True)
+
                 self.plot_predictions(df_processed, best_model)
             else:
                 st.warning("Could not calculate MSE for any model. Please check the data and timeframe.")
