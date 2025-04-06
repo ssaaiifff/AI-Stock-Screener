@@ -2,20 +2,6 @@ import streamlit as st
 import pandas as pd
 import os
 
-def set_background():
-    page_bg_img = '''
-    <style>
-    .stApp {
-        background: linear-gradient(to right, #3366ff, #ff99cc);
-        color: Black;
-    }
-    h1, h2, h3, h4, h5, h6, p, label, span, div {
-        color: black !important;
-    }
-    </style>
-    '''
-    st.markdown(page_bg_img, unsafe_allow_html=True)
-
 class AuthSystem:
     def __init__(self):
         self.file_path = "users.csv"
@@ -34,7 +20,6 @@ class AuthSystem:
         df.to_csv(self.file_path, index=False)
 
     def login_signup_screen(self):
-        st.title("Welcome to AI Stock Screener")
         tabs = ["Login", "Signup"]
         choice = st.radio("Select Option", tabs, key="auth_radio_fix_2025")
 
@@ -76,6 +61,3 @@ class AuthSystem:
                 st.session_state.authenticated = True
                 st.session_state.username = new_username
                 st.rerun()
-
-# Only background is applied globally, no logic executed here
-set_background()
