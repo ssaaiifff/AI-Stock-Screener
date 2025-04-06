@@ -5,3 +5,4 @@ scikit-learn
 plotly
 requests
 statsmodels
+google-genai
