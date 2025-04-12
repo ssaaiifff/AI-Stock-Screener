@@ -8,7 +8,9 @@ from datetime import datetime, timedelta
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from statsmodels.tsa.arima.model import ARIMA
 from google import genai
+import openai
 
+openai.api_key = "sk-proj-mkAEprCtbWcd2Ui2_eMMaLh5VSBHomM6olcpdtMlWiWxrixaYlT9KqFDOQpoufJGPrARTh1eyuT3BlbkFJTeB1XjaIcZ0ut1b6T0pHz7jLNWzGfxMe8z_1owjLy04r_0rDO9YxkuF7JBOppteHP66kIqQHA"
 
 class StockForecastModel:
     BASE_URL = "https://api.marketstack.com/v1/eod"
@@ -44,6 +46,35 @@ class StockForecastModel:
             return response.text.strip()
         except Exception as e:
             return f"⚠️ Could not generate recommendation due to error: {e}"
+
+
+    def generate_openai_recommendation(self, symbol, start, end, model, price, mse, frequency):
+
+        client = openai.OpenAI(api_key="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")
+
+        prompt = (
+            f"Stock: {symbol}\n"
+            f"Date Range: {start} to {end}\n"
+            f"Frequency: {frequency}\n"
+            f"Best Model: {model}\n"
+            f"Predicted Price: ${price:.2f}\n"
+            f"MSE: {mse:.4f}\n\n"
+            "Give a short recommendation to an investor in 1-2 sentences based on this prediction. "
+            "Keep it practical and realistic."
+        )
+
+        try:
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a financial advisor."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            return f"(OpenAI failed to generate recommendation: {str(e)})"
+
 
 
     def fetch_stock_data(self):
@@ -115,25 +146,28 @@ class StockForecastModel:
         except Exception as e:
             st.error(f"Error applying Random Forest: {e}")
             return None, None
+            
+
 
     def apply_moving_average(self, df_processed, window=3):
-        if df_processed is None or len(df_processed) < window:
-            return None, None
+            if df_processed is None or len(df_processed) < window:
+                return None, None
 
-        df_processed["Moving_Avg"] = df_processed["4. close"].rolling(window=window).mean()
-        if df_processed["Moving_Avg"].isnull().any():
-            return None, None
-        predicted_price = df_processed["Moving_Avg"].iloc[-1]
-        y_true = df_processed["4. close"].iloc[-window:]
-        y_pred = df_processed["Moving_Avg"].iloc[-window:]
-        try:
-            mse = mean_squared_error(y_true, y_pred)
-            return predicted_price, mse
-        except ValueError:
-            return None, None
-        except Exception as e:
-            st.error(f"Error applying Moving Average: {e}")
-            return None, None
+            df_processed["Moving_Avg"] = df_processed["4. close"].rolling(window=window).mean()
+            if df_processed["Moving_Avg"].isnull().any():
+                return None, None
+            predicted_price = df_processed["Moving_Avg"].iloc[-1]
+            y_true = df_processed["4. close"].iloc[-window:]
+            y_pred = df_processed["Moving_Avg"].iloc[-window:]
+            try:
+                mse = mean_squared_error(y_true, y_pred)
+                return predicted_price, mse
+            except ValueError:
+                return None, None
+            except Exception as e:
+                st.error(f"Error applying Moving Average: {e}")
+                return None, None
+        
 
     def apply_double_exponential_smoothing(self, df_processed):
         if df_processed is None or len(df_processed) < 3:
@@ -149,42 +183,44 @@ class StockForecastModel:
             st.error(f"Error applying Double Exponential Smoothing: {e}")
             return None, None
 
+
     def apply_arima(self, df_processed):
-        if df_processed is None:
-            st.warning("Input DataFrame is None.")
-            return None, None
+            if df_processed is None:
+                st.warning("Input DataFrame is None.")
+                return None, None
 
-        if len(df_processed) < 10:
-            st.warning(f"Not enough data points ({len(df_processed)} < 10). Cannot apply ARIMA.")
-            return None, None
+            if len(df_processed) < 10:
+                st.warning(f"Not enough data points ({len(df_processed)} < 10). Cannot apply ARIMA.")
+                return None, None
 
-        df_processed = df_processed.dropna(subset=["4. close"])
-        if df_processed.empty:
-            st.warning("No valid data points after removing NaN values.")
-            return None, None
+            df_processed = df_processed.dropna(subset=["4. close"])
+            if df_processed.empty:
+                st.warning("No valid data points after removing NaN values.")
+                return None, None
 
-        if len(df_processed) < 3:
-            st.warning(f"Insufficient valid data points ({len(df_processed)} < 3) after cleaning.")
-            return None, None
+            if len(df_processed) < 3:
+                st.warning(f"Insufficient valid data points ({len(df_processed)} < 3) after cleaning.")
+                return None, None
 
-        try:
-            model = ARIMA(df_processed["4. close"], order=(1, 1, 1)).fit()
-            predicted_price = model.forecast(steps=1)[0]
+            try:
+                model = ARIMA(df_processed["4. close"], order=(1, 1, 1)).fit()
+                predicted_price = model.forecast(steps=1)[0]
 
-            fitted_values = model.fittedvalues.dropna()
-            if len(fitted_values) < 2:
-                st.warning("Insufficient fitted values to calculate MSE.")
-                return predicted_price, None
+                fitted_values = model.fittedvalues.dropna()
+                if len(fitted_values) < 2:
+                    st.warning("Insufficient fitted values to calculate MSE.")
+                    return predicted_price, None
 
-            mse = mean_squared_error(df_processed["4. close"][:len(fitted_values)], fitted_values)
-            return predicted_price, mse
+                mse = mean_squared_error(df_processed["4. close"][:len(fitted_values)], fitted_values)
+                return predicted_price, mse
 
-        except ValueError as ve:
-             #st.error(f"ARIMA ValueError: {ve}")
-            return None, None
-        except Exception as e:
-             #st.error(f"ARIMA Error: {e}")
-            return None, None
+            except ValueError as ve:
+                #st.error(f"ARIMA ValueError: {ve}")
+                return None, None
+            except Exception as e:
+                #st.error(f"ARIMA Error: {e}")
+                return None, None
+
 
 
     def plot_predictions(self, df_processed, model_name):
@@ -247,6 +283,9 @@ class StockForecastModel:
             st.plotly_chart(fig)  # Show empty figure
             return
 
+
+
+        
         fig.update_layout(
             title=dict(
                 text=f"{model_name} Predictions vs Actual",
@@ -286,42 +325,51 @@ class StockForecastModel:
 
 
     def run(self):
-        stock_symbols = {
-            "AAPL": "Apple Inc.",
-            "MSFT": "Microsoft Corporation",
-            "TSLA": "Tesla, Inc.",
-            "AMZN": "Amazon.com, Inc.",
-            "GOOGL": "Alphabet Inc.",
-            "META": "Meta Platforms, Inc.",
-            "NFLX": "Netflix, Inc.",
-            "NVDA": "NVIDIA Corporation",
-            "AMD": "Advanced Micro Devices, Inc.",
-            "INTC": "Intel Corporation",
-            "IBM": "International Business Machines Corporation",
-            "ORCL": "Oracle Corporation",
-            "CSCO": "Cisco Systems, Inc.",
-            "QCOM": "Qualcomm Incorporated",
-            "ADBE": "Adobe Inc.",
-            "PYPL": "PayPal Holdings, Inc.",
-            "CRM": "Salesforce, Inc.",
-            "UBER": "Uber Technologies, Inc.",
-            "LYFT": "Lyft, Inc.",
-            "SQ": "Block, Inc. (Square)",
-            "BABA": "Alibaba Group Holding Limited",
-            "TCEHY": "Tencent Holdings Limited",
-            "SHOP": "Shopify Inc.",
-            "V": "Visa Inc.",
-            "MA": "Mastercard Incorporated",
-            "JPM": "JPMorgan Chase & Co.",
-            "GS": "Goldman Sachs Group, Inc.",
-            "WMT": "Walmart Inc.",
-            "COST": "Costco Wholesale Corporation",
-            "PEP": "PepsiCo, Inc.",
-            "KO": "The Coca-Cola Company",
-            "MCD": "McDonald's Corporation",
-            "NKE": "Nike, Inc.",
-            "DIS": "The Walt Disney Company"
-        }
+        
+        try:
+            df = pd.read_csv("stocks.csv")  # Replace with the actual filename
+            df = df[df["Test Issue"] == "N"]  # Exclude test listings
+            df = df[df["ETF"] == "N"]         # Optional: Exclude ETFs if not needed
+            stock_symbols = dict(zip(df["Symbol"], df["Security Name"]))
+        except Exception as e:
+            st.error("Failed to load stock symbols from CSV. Using default list.")
+            stock_symbols = {
+                "AAPL": "Apple Inc.",
+                "MSFT": "Microsoft Corporation",
+                "TSLA": "Tesla, Inc.",
+                "AMZN": "Amazon.com, Inc.",
+                "GOOGL": "Alphabet Inc.",
+                "META": "Meta Platforms, Inc.",
+                "NFLX": "Netflix, Inc.",
+                "NVDA": "NVIDIA Corporation",
+                "AMD": "Advanced Micro Devices, Inc.",
+                "INTC": "Intel Corporation",
+                "IBM": "International Business Machines Corporation",
+                "ORCL": "Oracle Corporation",
+                "CSCO": "Cisco Systems, Inc.",
+                "QCOM": "Qualcomm Incorporated",
+                "ADBE": "Adobe Inc.",
+                "PYPL": "PayPal Holdings, Inc.",
+                "CRM": "Salesforce, Inc.",
+                "UBER": "Uber Technologies, Inc.",
+                "LYFT": "Lyft, Inc.",
+                "SQ": "Block, Inc. (Square)",
+                "BABA": "Alibaba Group Holding Limited",
+                "TCEHY": "Tencent Holdings Limited",
+                "SHOP": "Shopify Inc.",
+                "V": "Visa Inc.",
+                "MA": "Mastercard Incorporated",
+                "JPM": "JPMorgan Chase & Co.",
+                "GS": "Goldman Sachs Group, Inc.",
+                "WMT": "Walmart Inc.",
+                "COST": "Costco Wholesale Corporation",
+                "PEP": "PepsiCo, Inc.",
+                "KO": "The Coca-Cola Company",
+                "MCD": "McDonald's Corporation",
+                "NKE": "Nike, Inc.",
+                "DIS": "The Walt Disney Company"
+            }
+
 
         self.symbol = st.sidebar.selectbox("Select a Stock Symbol:", list(stock_symbols.keys()))
         self.timeframe = st.sidebar.selectbox("Select Timeframe:", ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly"])
@@ -383,6 +431,35 @@ class StockForecastModel:
                     mse=best_mse
                 ), unsafe_allow_html=True)
                 st.markdown("<br><br>", unsafe_allow_html=True)
+
+
+                # Generate OpenAI recommendation in same format
+                openai_recommendation = self.generate_openai_recommendation(
+                    self.symbol, 
+                    self.start_date.strftime('%Y-%m-%d'),
+                    self.end_date.strftime('%Y-%m-%d'),
+                    best_model,
+                    best_price,
+                    best_mse,
+                    self.timeframe
+                )
+
+                st.markdown("""
+                    <div style="
+                        margin-top: 20px;
+                        padding: 15px;
+                        border-left: 5px solid #4CAF50;
+                        background-color: rgba(255,255,255,0.3);
+                        border-radius: 10px;
+                        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+                    ">
+                    <h4>🧠 OpenAI's Recommendation</h4>
+                    <p style="font-style: italic;">{}</p>
+                    </div>
+                """.format(openai_recommendation), unsafe_allow_html=True)
+
+
+
 
                 recommendation = self.generate_recommendation(
                     self.symbol, 

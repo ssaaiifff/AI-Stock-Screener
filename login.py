@@ -15,11 +15,13 @@ class AuthSystem:
 
     def load_users(self):
         return pd.read_csv(self.file_path)
+        
 
     def save_users(self, df):
         df.to_csv(self.file_path, index=False)
 
     def login_signup_screen(self):
+
         tabs = ["Login", "Signup"]
         choice = st.radio("Select Option", tabs, key="auth_radio_fix_2025")
 
