@@ -10,7 +10,7 @@ from statsmodels.tsa.arima.model import ARIMA
 from google import genai
 import openai
 
-openai.api_key = "sk-proj-mkAEprCtbWcd2Ui2_eMMaLh5VSBHomM6olcpdtMlWiWxrixaYlT9KqFDOQpoufJGPrARTh1eyuT3BlbkFJTeB1XjaIcZ0ut1b6T0pHz7jLNWzGfxMe8z_1owjLy04r_0rDO9YxkuF7JBOppteHP66kIqQHA"
+openai.api_key = "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"
 
 class StockForecastModel:
     BASE_URL = "https://api.marketstack.com/v1/eod"
