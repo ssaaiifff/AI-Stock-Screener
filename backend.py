@@ -25,7 +25,7 @@ class StockForecastModel:
         self.timeframe = "Monthly"
         self.start_date = None
         self.end_date = None
-        self.genai_client = genai.Client(api_key="AIzaSyANcyTEGxPrVnOQ1_KTD6xfNNmyYmJEyZ4")
+        self.genai_client = genai.Client(api_key="AIzaSyCni0BuXVqecP8ks8608aHLIgNE-D_aOQM")
 
 
     def generate_recommendation(self, symbol, start, end, model, price, mse, frequency):
